@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skin AI Classifier</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-4">
+
+    <header class="text-center my-6">
+        <h1 class="text-2xl font-bold text-blue-400">Skin Condition AI</h1>
+        <p class="text-slate-400 text-sm">Pixel 9 Real-time Classifier</p>
+    </header>
+
+    <div id="webcam-container" class="relative rounded-2xl overflow-hidden border-4 border-slate-700 bg-black w-full max-w-sm aspect-square shadow-2xl">
+        <div id="placeholder" class="absolute inset-0 flex items-center justify-center text-slate-500 italic">
+            Camera inactive
+        </div>
+    </div>
+
+    <div class="mt-8 w-full max-w-sm">
+        <button type="button" onclick="init()" id="start-btn" 
+            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all active:scale-95 shadow-lg">
+            Start Analysis
+        </button>
+
+        <div id="label-container" class="mt-6 space-y-3"></div>
+    </div>
+
+    <script type="text/javascript">
+        // Points to the files you uploaded to your GitHub repo
+        const URL = "./"; 
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        async function init() {
+            const startBtn = document.getElementById("start-btn");
+            startBtn.disabled = true;
+            startBtn.innerHTML = "Loading Model...";
+
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // Load the model
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            // Setup webcam for Pixel 9 back camera
+            const flip = false; 
+            const width = 400;
+            const height = 400;
+            webcam = new tmImage.Webcam(width, height, flip); 
+            
+            // Use 'environment' to trigger the back camera
+            await webcam.setup({ facingMode: "environment" }); 
+            await webcam.play();
+            
+            document.getElementById("placeholder").classList.add("hidden");
+            window.requestAnimationFrame(loop);
+
+            // UI Adjustments
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            webcam.canvas.classList.add("w-full", "h-full", "object-cover");
+            
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+
+            startBtn.classList.add("hidden");
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            for (let i = 0; i < maxPredictions; i++) {
+                const probability = (prediction[i].probability * 100).toFixed(0);
+                const colorClass = probability > 70 ? 'text-green-400' : 'text-blue-300';
+                
+                const classPrediction = `
+                    <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex justify-between items-center shadow-sm">
+                        <span class="font-medium text-slate-200">${prediction[i].className}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono text-xl font-bold ${colorClass}">${probability}%</span>
+                        </div>
+                    </div>`;
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+        }
+    </script>
+</body>
+</html>
