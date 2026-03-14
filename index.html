@@ -21,47 +21,45 @@
         </div>
     </div>
 
-    <div class="mt-8 w-full max-w-sm">
+    <div class="mt-8 w-full max-w-sm flex flex-col gap-3">
         <button type="button" onclick="init()" id="start-btn" 
             class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all active:scale-95 shadow-lg">
             Start Analysis
         </button>
 
-        <div id="label-container" class="mt-6 space-y-3"></div>
+        <button type="button" onclick="toggleFreeze()" id="freeze-btn" 
+            class="hidden w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl transition-all shadow-md">
+            Freeze Results
+        </button>
+
+        <div id="label-container" class="mt-4 space-y-3"></div>
     </div>
 
     <script type="text/javascript">
-        // Points to the files you uploaded to your GitHub repo
         const URL = "./"; 
-
         let model, webcam, labelContainer, maxPredictions;
+        
+        // Smoothing Variables
+        let predictionHistory = [];
+        const HISTORY_SIZE = 10; // Averaging over 10 frames (~0.3 seconds)
+        let isFrozen = false;
 
         async function init() {
             const startBtn = document.getElementById("start-btn");
             startBtn.disabled = true;
-            startBtn.innerHTML = "Loading Model...";
+            startBtn.innerHTML = "Loading...";
 
-            const modelURL = URL + "model.json";
-            const metadataURL = URL + "metadata.json";
-
-            // Load the model
-            model = await tmImage.load(modelURL, metadataURL);
+            model = await tmImage.load(URL + "model.json", URL + "metadata.json");
             maxPredictions = model.getTotalClasses();
 
-            // Setup webcam for Pixel 9 back camera
-            const flip = false; 
-            const width = 400;
-            const height = 400;
-            webcam = new tmImage.Webcam(width, height, flip); 
-            
-            // Use 'environment' to trigger the back camera
+            webcam = new tmImage.Webcam(400, 400, false); 
             await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
             
             document.getElementById("placeholder").classList.add("hidden");
-            window.requestAnimationFrame(loop);
+            document.getElementById("freeze-btn").classList.remove("hidden");
+            startBtn.classList.add("hidden");
 
-            // UI Adjustments
             document.getElementById("webcam-container").appendChild(webcam.canvas);
             webcam.canvas.classList.add("w-full", "h-full", "object-cover");
             
@@ -70,29 +68,51 @@
                 labelContainer.appendChild(document.createElement("div"));
             }
 
-            startBtn.classList.add("hidden");
-        }
-
-        async function loop() {
-            webcam.update();
-            await predict();
             window.requestAnimationFrame(loop);
         }
 
+        async function loop() {
+            if (!isFrozen) {
+                webcam.update();
+                await predict();
+            }
+            window.requestAnimationFrame(loop);
+        }
+
+        function toggleFreeze() {
+            isFrozen = !isFrozen;
+            const btn = document.getElementById("freeze-btn");
+            btn.innerHTML = isFrozen ? "Resume Analysis" : "Freeze Results";
+            btn.classList.toggle("bg-red-600", isFrozen);
+            btn.classList.toggle("bg-slate-700", !isFrozen);
+        }
+
         async function predict() {
-            const prediction = await model.predict(webcam.canvas);
+            const currentPrediction = await model.predict(webcam.canvas);
+            
+            // Add current frame to history
+            predictionHistory.push(currentPrediction);
+            if (predictionHistory.length > HISTORY_SIZE) predictionHistory.shift();
+
             for (let i = 0; i < maxPredictions; i++) {
-                const probability = (prediction[i].probability * 100).toFixed(0);
-                const colorClass = probability > 70 ? 'text-green-400' : 'text-blue-300';
+                // Calculate Average Probability
+                let sum = 0;
+                for (let j = 0; j < predictionHistory.length; j++) {
+                    sum += predictionHistory[j][i].probability;
+                }
+                const avgProb = sum / predictionHistory.length;
+                const probability = (avgProb * 100).toFixed(0);
                 
-                const classPrediction = `
+                // Styling
+                const colorClass = avgProb > 0.7 ? 'text-green-400' : 'text-blue-300';
+                
+                labelContainer.childNodes[i].innerHTML = `
                     <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex justify-between items-center shadow-sm">
-                        <span class="font-medium text-slate-200">${prediction[i].className}</span>
+                        <span class="font-medium text-slate-200">${currentPrediction[i].className}</span>
                         <div class="flex items-center gap-2">
                             <span class="font-mono text-xl font-bold ${colorClass}">${probability}%</span>
                         </div>
                     </div>`;
-                labelContainer.childNodes[i].innerHTML = classPrediction;
             }
         }
     </script>
