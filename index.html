@@ -12,7 +12,7 @@
 
     <header class="text-center my-6">
         <h1 class="text-2xl font-bold text-blue-400">Skin Condition AI</h1>
-        <p class="text-slate-400 text-sm">Pixel 9 Real-time Classifier</p>
+        <p class="text-slate-400 text-sm italic">Confidential Local Analysis</p>
     </header>
 
     <div id="webcam-container" class="relative rounded-2xl overflow-hidden border-4 border-slate-700 bg-black w-full max-w-sm aspect-square shadow-2xl">
@@ -27,22 +27,29 @@
             Start Analysis
         </button>
 
-        <button type="button" onclick="toggleFreeze()" id="freeze-btn" 
-            class="hidden w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl transition-all shadow-md">
-            Freeze Results
-        </button>
+        <div id="active-controls" class="hidden flex flex-col gap-3">
+            <button type="button" onclick="toggleFreeze()" id="freeze-btn" 
+                class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl transition-all shadow-md">
+                Freeze Results
+            </button>
+            <button type="button" onclick="captureReport()" id="capture-btn" 
+                class="w-full bg-green-700 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
+                Save Report Image
+            </button>
+        </div>
 
         <div id="label-container" class="mt-4 space-y-3"></div>
     </div>
 
+    <canvas id="capture-canvas" width="400" height="600" class="hidden"></canvas>
+
     <script type="text/javascript">
         const URL = "./"; 
         let model, webcam, labelContainer, maxPredictions;
-        
-        // Smoothing Variables
         let predictionHistory = [];
-        const HISTORY_SIZE = 10; // Averaging over 10 frames (~0.3 seconds)
+        const HISTORY_SIZE = 10;
         let isFrozen = false;
+        let lastAveragedResults = [];
 
         async function init() {
             const startBtn = document.getElementById("start-btn");
@@ -57,7 +64,7 @@
             await webcam.play();
             
             document.getElementById("placeholder").classList.add("hidden");
-            document.getElementById("freeze-btn").classList.remove("hidden");
+            document.getElementById("active-controls").classList.remove("hidden");
             startBtn.classList.add("hidden");
 
             document.getElementById("webcam-container").appendChild(webcam.canvas);
@@ -84,18 +91,16 @@
             const btn = document.getElementById("freeze-btn");
             btn.innerHTML = isFrozen ? "Resume Analysis" : "Freeze Results";
             btn.classList.toggle("bg-red-600", isFrozen);
-            btn.classList.toggle("bg-slate-700", !isFrozen);
         }
 
         async function predict() {
             const currentPrediction = await model.predict(webcam.canvas);
-            
-            // Add current frame to history
             predictionHistory.push(currentPrediction);
             if (predictionHistory.length > HISTORY_SIZE) predictionHistory.shift();
 
+            lastAveragedResults = [];
+
             for (let i = 0; i < maxPredictions; i++) {
-                // Calculate Average Probability
                 let sum = 0;
                 for (let j = 0; j < predictionHistory.length; j++) {
                     sum += predictionHistory[j][i].probability;
@@ -103,17 +108,52 @@
                 const avgProb = sum / predictionHistory.length;
                 const probability = (avgProb * 100).toFixed(0);
                 
-                // Styling
+                lastAveragedResults.push({ name: currentPrediction[i].className, prob: probability });
+
                 const colorClass = avgProb > 0.7 ? 'text-green-400' : 'text-blue-300';
-                
                 labelContainer.childNodes[i].innerHTML = `
-                    <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex justify-between items-center shadow-sm">
+                    <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex justify-between items-center">
                         <span class="font-medium text-slate-200">${currentPrediction[i].className}</span>
-                        <div class="flex items-center gap-2">
-                            <span class="font-mono text-xl font-bold ${colorClass}">${probability}%</span>
-                        </div>
+                        <span class="font-mono text-xl font-bold ${colorClass}">${probability}%</span>
                     </div>`;
             }
+        }
+
+        function captureReport() {
+            const canvas = document.getElementById("capture-canvas");
+            const ctx = canvas.getContext("2d");
+
+            // 1. Draw Camera Frame
+            ctx.fillStyle = "#0f172a"; // Slate-900
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(webcam.canvas, 0, 0, 400, 400);
+
+            // 2. Draw Report Background
+            ctx.fillStyle = "#1e293b"; // Slate-800
+            ctx.fillRect(0, 400, 400, 200);
+
+            // 3. Add Text Metadata
+            ctx.fillStyle = "#38bdf8"; // Blue-400
+            ctx.font = "bold 20px Arial";
+            ctx.fillText("AI CLASSIFICATION REPORT", 20, 440);
+            
+            ctx.fillStyle = "#cbd5e1"; // Slate-300
+            ctx.font = "16px Arial";
+            const date = new Date().toLocaleString();
+            ctx.fillText(date, 20, 465);
+
+            // 4. Add Predictions to Image
+            lastAveragedResults.forEach((res, index) => {
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 18px Arial";
+                ctx.fillText(`${res.name}: ${res.prob}%`, 20, 510 + (index * 30));
+            });
+
+            // 5. Download the image
+            const link = document.createElement('a');
+            link.download = `Skin_Report_${Date.now()}.jpg`;
+            link.href = canvas.toDataURL("image/jpeg", 0.9);
+            link.click();
         }
     </script>
 </body>
