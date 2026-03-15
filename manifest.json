@@ -1,7 +1,8 @@
 {
-  "name": "DermDx AI",
+  "name": "DermDx AI Clinical Support",
   "short_name": "DermDx",
-  "start_url": "index.html",
+  "description": "On-device dermatological triage utility.",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#3b82f6",
@@ -9,7 +10,14 @@
     {
       "src": "https://cdn-icons-png.flaticon.com/512/2966/2966327.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2966/2966327.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
