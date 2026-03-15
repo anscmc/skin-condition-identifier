@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DermDx AI | Clinical Support</title>
+    <link rel="manifest" href="./manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #0f172a; color: white; font-family: sans-serif; }
@@ -31,41 +32,47 @@
         </div>
     </div>
 
-    <div class="mt-auto pt-8">
-        <div class="mt-8 text-[10px] text-slate-600 text-center leading-relaxed">
-            PROTOTYPE ONLY. NOT FOR DIAGNOSIS.<br>
-            PRIVACY-BY-DESIGN: ON-DEVICE INFERENCE ACTIVE.
-        </div>
+    <div class="mt-auto pt-8 text-[10px] text-slate-600 text-center leading-relaxed">
+        PROTOTYPE ONLY. NOT FOR DIAGNOSIS.<br>
+        PRIVACY-BY-DESIGN: ON-DEVICE INFERENCE ACTIVE.
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
     <script type="text/javascript">
+        // Ensure path is correct for your root directory
         const URL = "./"; 
         let model, webcam, labelContainer, maxPredictions;
-        
         let predictionHistory = [];
         const HISTORY_SIZE = 10; 
         const CONFIDENCE_THRESHOLD = 0.70;
 
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js');
+        }
+
         async function init() {
             document.getElementById("init-button").style.display = "none";
-            const modelURL = URL + "model.json";
-            const metadataURL = URL + "metadata.json";
+            try {
+                const modelURL = URL + "model.json";
+                const metadataURL = URL + "metadata.json";
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
 
-            model = await tmImage.load(modelURL, metadataURL);
-            maxPredictions = model.getTotalClasses();
+                const flip = false; 
+                webcam = new tmImage.Webcam(400, 400, flip); 
+                await webcam.setup({ facingMode: "environment" }); 
+                await webcam.play();
+                window.requestAnimationFrame(loop);
 
-            const flip = false; 
-            webcam = new tmImage.Webcam(400, 400, flip); 
-            
-            await webcam.setup({ facingMode: "environment" }); 
-            await webcam.play();
-            window.requestAnimationFrame(loop);
-
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
-            labelContainer = document.getElementById("label-container");
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
+            } catch (e) {
+                alert("Camera or Model load failed. Ensure you are on HTTPS.");
+                console.error(e);
+            }
         }
 
         async function loop() {
@@ -107,13 +114,10 @@
                     if (res.name !== "Neither") {
                         const isWinner = res.name === topClass.name;
                         const probDisplay = (res.prob * 100).toFixed(0);
-                        
                         resultsHTML += `
-                            <div class="bg-slate-800 border-2 ${isWinner ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-slate-700/50'} p-6 rounded-2xl flex justify-between items-center transition-all duration-300">
-                                <span class="${isWinner ? 'text-white font-bold text-lg' : 'text-slate-400 font-medium'}">${res.name}</span>
-                                <div class="flex items-center">
-                                    <span class="${isWinner ? 'text-blue-400' : 'text-slate-500'} font-mono text-3xl font-bold">${probDisplay}%</span>
-                                </div>
+                            <div class="bg-slate-800 border-2 ${isWinner ? 'border-blue-500 shadow-lg' : 'border-slate-700/50'} p-6 rounded-2xl flex justify-between items-center transition-all duration-300">
+                                <span class="${isWinner ? 'text-white font-bold' : 'text-slate-400'}">${res.name}</span>
+                                <span class="${isWinner ? 'text-blue-400' : 'text-slate-500'} font-mono text-3xl font-bold">${probDisplay}%</span>
                             </div>`;
                     }
                 });
