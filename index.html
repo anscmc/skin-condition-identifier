@@ -1,163 +1,92 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skin AI Classifier</title>
-    <link rel="manifest" href="./manifest.json">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-</head>
-<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-4">
+<div>DermDx AI: Clinical Support Utility</div>
+<button type="button" onclick="init()" class="start-btn">Start Analysis</button>
+<div id="webcam-container"></div>
+<div id="label-container"></div>
 
-    <header class="text-center my-6">
-        <h1 class="text-2xl font-bold text-blue-400">Skin Condition AI</h1>
-        <p class="text-slate-400 text-sm">Pixel 9 Real-time Classifier</p>
-    </header>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
-    <div id="webcam-container" class="relative rounded-2xl overflow-hidden border-4 border-slate-700 bg-black w-full max-w-sm aspect-square shadow-2xl">
-        <div id="placeholder" class="absolute inset-0 flex items-center justify-center text-slate-500 italic text-center px-4">
-            Waiting for camera...
-        </div>
-    </div>
+<script type="text/javascript">
+    const URL = "./"; // Pointing to the root where your 3 model files are
+    let model, webcam, labelContainer, maxPredictions;
+    
+    // Smoothing & Logic Constants
+    let predictionHistory = [];
+    const HISTORY_SIZE = 10; 
+    const CONFIDENCE_THRESHOLD = 0.70;
 
-    <div class="mt-8 w-full max-w-sm flex flex-col gap-3">
-        <button type="button" onclick="init()" id="start-btn" 
-            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all active:scale-95 shadow-lg">
-            Start Analysis
-        </button>
+    async function init() {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
 
-        <button type="button" onclick="toggleFreeze()" id="freeze-btn" 
-            class="hidden w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl transition-all shadow-md">
-            Freeze Results
-        </button>
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
 
-        <div id="label-container" class="mt-4 space-y-3"></div>
-    </div>
+        const flip = true; 
+        webcam = new tmImage.Webcam(300, 300, flip); 
+        await webcam.setup(); 
+        await webcam.play();
+        window.requestAnimationFrame(loop);
 
-    <footer class="mt-auto pt-10 pb-6 w-full max-w-sm text-center">
-        <div class="border-t border-slate-800 pt-6">
-            <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Regulatory Notice</p>
-            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
-                This application is a <strong>Clinical Decision Support Prototype</strong> for research purposes only. 
-                It is not FDA-cleared for diagnosis. All results must be verified by a licensed medical professional. 
-                <strong>Privacy:</strong> No data is transmitted or stored externally.
-            </p>
-        </div>
-    </footer>
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+    }
 
-    <script type="text/javascript">
-        const URL = "./"; 
-        let model, webcam, labelContainer, maxPredictions;
+    async function loop() {
+        webcam.update(); 
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
         
-        // State Variables
-        let predictionHistory = [];
-        const HISTORY_SIZE = 10;
-        let isFrozen = false;
-        const CONFIDENCE_THRESHOLD = 0.70; // 70% required to show result
+        // Push current frame to history for smoothing
+        predictionHistory.push(prediction);
+        if (predictionHistory.length > HISTORY_SIZE) predictionHistory.shift();
 
-        // 1. Self-Destruct Timer (Refresh if idle for 2 minutes)
-        let inactivityTimer;
-        function resetTimer() {
-            clearTimeout(inactivityTimer);
-            inactivityTimer = setTimeout(() => {
-                window.location.reload(); 
-            }, 120000); 
-        }
-        window.addEventListener('touchstart', resetTimer);
-        window.addEventListener('click', resetTimer);
+        // Calculate averages across the last 10 frames
+        let averagedResults = [];
+        let topClass = { name: "", prob: 0 };
 
-        async function init() {
-            resetTimer();
-            const startBtn = document.getElementById("start-btn");
-            startBtn.disabled = true;
-            startBtn.innerHTML = "Loading...";
-
-            model = await tmImage.load(URL + "model.json", URL + "metadata.json");
-            maxPredictions = model.getTotalClasses();
-
-            webcam = new tmImage.Webcam(400, 400, false); 
-            await webcam.setup({ facingMode: "environment" }); 
-            await webcam.play();
-            
-            document.getElementById("placeholder").classList.add("hidden");
-            document.getElementById("freeze-btn").classList.remove("hidden");
-            startBtn.classList.add("hidden");
-
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
-            webcam.canvas.classList.add("w-full", "h-full", "object-cover");
-            
-            labelContainer = document.getElementById("label-container");
-            window.requestAnimationFrame(loop);
-        }
-
-        async function loop() {
-            if (!isFrozen) {
-                webcam.update();
-                await predict();
+        for (let i = 0; i < maxPredictions; i++) {
+            let sum = 0;
+            for (let j = 0; j < predictionHistory.length; j++) {
+                sum += predictionHistory[j][i].probability;
             }
-            window.requestAnimationFrame(loop);
+            let avgProb = sum / predictionHistory.length;
+            averagedResults.push({ name: prediction[i].className, prob: avgProb });
+            
+            if (avgProb > topClass.prob) {
+                topClass = { name: prediction[i].className, prob: avgProb };
+            }
         }
 
-        function toggleFreeze() {
-            isFrozen = !isFrozen;
-            const btn = document.getElementById("freeze-btn");
-            btn.innerHTML = isFrozen ? "Resume Analysis" : "Freeze Results";
-            btn.classList.toggle("bg-red-600", isFrozen);
-            btn.classList.toggle("bg-slate-700", !isFrozen);
-        }
-
-        async function predict() {
-            const currentPrediction = await model.predict(webcam.canvas);
-            predictionHistory.push(currentPrediction);
-            if (predictionHistory.length > HISTORY_SIZE) predictionHistory.shift();
-
-            let topClass = { name: "", prob: 0 };
+        // Logic: If 'Neither' is dominant OR confidence is too low, show "Inconclusive"
+        if (topClass.name === "Neither" || topClass.prob < CONFIDENCE_THRESHOLD) {
+            labelContainer.innerHTML = `
+                <div style="background: #1e293b; color: #94a3b8; padding: 20px; border-radius: 12px; border: 2px dashed #475569; text-align: center;">
+                    <span style="font-style: italic; font-weight: 500;">Analysis Inconclusive...</span>
+                    <p style="font-size: 10px; margin-top: 8px; letter-spacing: 1px;">ADJUST FRAMING OR LIGHTING</p>
+                </div>`;
+        } else {
+            // Display Medical Predictions (hiding the 'Neither' bar for a cleaner UI)
             let resultsHTML = "";
-            let averagedResults = [];
-
-            // Calculate Averages
-            for (let i = 0; i < maxPredictions; i++) {
-                let sum = 0;
-                for (let j = 0; j < predictionHistory.length; j++) {
-                    sum += predictionHistory[j][i].probability;
-                }
-                const avgProb = sum / predictionHistory.length;
-                averagedResults.push({ name: currentPrediction[i].className, prob: avgProb });
-                
-                if (avgProb > topClass.prob) {
-                    topClass = { name: currentPrediction[i].className, prob: avgProb };
-                }
-            }
-
-            // Logic: Show "Uncertain" if top prediction is under threshold
-            if (topClass.prob < CONFIDENCE_THRESHOLD) {
-                labelContainer.innerHTML = `
-                    <div class="bg-slate-800 border-2 border-dashed border-slate-700 p-6 rounded-xl text-center">
-                        <span class="text-slate-400 font-medium italic italic">Scanning / Uncertain...</span>
-                        <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-tighter">Adjust lighting or distance for better confidence</p>
-                    </div>`;
-            } else {
-                averagedResults.forEach(res => {
+            averagedResults.forEach(res => {
+                if (res.name !== "Neither") {
                     const isWinner = res.name === topClass.name;
                     const probDisplay = (res.prob * 100).toFixed(0);
-                    const colorClass = isWinner ? 'text-green-400' : 'text-slate-500';
-
+                    const color = isWinner ? "#4ade80" : "#94a3b8";
+                    const border = isWinner ? "2px solid #22c55e" : "1px solid #334155";
+                    
                     resultsHTML += `
-                        <div class="bg-slate-800 border ${isWinner ? 'border-green-500 shadow-lg shadow-green-900/20' : 'border-slate-700'} p-4 rounded-xl flex justify-between items-center transition-all">
-                            <span class="font-medium ${isWinner ? 'text-white' : 'text-slate-400'}">${res.name}</span>
-                            <span class="font-mono text-xl font-bold ${colorClass}">${probDisplay}%</span>
+                        <div style="background: #1e293b; border: ${border}; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: ${isWinner ? '#fff' : '#94a3b8'}; font-weight: ${isWinner ? 'bold' : 'normal'}">${res.name}</span>
+                            <span style="color: ${color}; font-family: monospace; font-size: 20px;">${probDisplay}%</span>
                         </div>`;
-                });
-                labelContainer.innerHTML = resultsHTML;
-            }
+                }
+            });
+            labelContainer.innerHTML = resultsHTML;
         }
-
-        // PWA Service Worker Registration
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js');
-        }
-    </script>
-</body>
-</html>
+    }
+</script>
