@@ -55,4 +55,71 @@
             const metadataURL = URL + "metadata.json";
 
             model = await tmImage.load(modelURL, metadataURL);
-            maxPredictions =
+            maxPredictions = model.getTotalClasses();
+
+            const flip = false; 
+            webcam = new tmImage.Webcam(400, 400, flip); 
+            
+            await webcam.setup({ facingMode: "environment" }); 
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+        }
+
+        async function loop() {
+            webcam.update(); 
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            predictionHistory.push(prediction);
+            if (predictionHistory.length > HISTORY_SIZE) predictionHistory.shift();
+
+            let averagedResults = [];
+            let topClass = { name: "", prob: 0 };
+
+            for (let i = 0; i < maxPredictions; i++) {
+                let sum = 0;
+                for (let j = 0; j < predictionHistory.length; j++) {
+                    sum += predictionHistory[j][i].probability;
+                }
+                let avgProb = sum / predictionHistory.length;
+                averagedResults.push({ name: prediction[i].className, prob: avgProb });
+                
+                if (avgProb > topClass.prob) {
+                    topClass = { name: prediction[i].className, prob: avgProb };
+                }
+            }
+
+            if (topClass.name === "Neither" || topClass.prob < CONFIDENCE_THRESHOLD) {
+                labelContainer.innerHTML = `
+                    <div class="bg-slate-900 border-2 border-dashed border-slate-700 p-10 rounded-3xl text-center shadow-inner">
+                        <span class="text-slate-500 font-semibold italic text-lg block">Scanning...</span>
+                        <p class="text-[9px] text-slate-600 mt-3 uppercase tracking-[0.3em] font-bold">Waiting for conclusive clinical markers</p>
+                    </div>`;
+            } else {
+                let resultsHTML = "";
+                averagedResults.forEach(res => {
+                    if (res.name !== "Neither") {
+                        const isWinner = res.name === topClass.name;
+                        const probDisplay = (res.prob * 100).toFixed(0);
+                        
+                        resultsHTML += `
+                            <div class="bg-slate-800 border-2 ${isWinner ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-slate-700/50'} p-6 rounded-2xl flex justify-between items-center transition-all duration-300">
+                                <span class="${isWinner ? 'text-white font-bold text-lg' : 'text-slate-400 font-medium'}">${res.name}</span>
+                                <div class="flex items-center">
+                                    <span class="${isWinner ? 'text-blue-400' : 'text-slate-500'} font-mono text-3xl font-bold">${probDisplay}%</span>
+                                </div>
+                            </div>`;
+                    }
+                });
+                labelContainer.innerHTML = resultsHTML;
+            }
+        }
+    </script>
+</body>
+</html>
