@@ -1,4 +1,4 @@
-const CACHE_NAME = 'skin-ai-v3.0';
+const CACHE_NAME = 'dermdx-ai-v1.1';
 const assets = [
   './', 
   './index.html', 
