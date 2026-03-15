@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dermdx-ai-v1.1';
+const CACHE_NAME = 'dermdx-ai-v1.2'; // BUMPED VERSION
 const assets = [
   './', 
   './index.html', 
@@ -7,17 +7,28 @@ const assets = [
   './weights.bin'
 ];
 
-// Install the service worker and cache all files locally
+// Install: Cache new assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Caching medical assets...');
       return cache.addAll(assets);
     })
   );
 });
 
-// Serve files from cache when offline
+// Activate: Delete old caches so the new UI/Model shows up
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.filter((name) => name !== CACHE_NAME)
+                  .map((name) => caches.delete(name))
+      );
+    })
+  );
+});
+
+// Fetch: Serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((response) => {
