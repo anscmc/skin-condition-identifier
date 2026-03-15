@@ -3,37 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DermDx AI</title>
+    <title>DermDx AI | Clinical Support</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #0f172a; color: white; font-family: sans-serif; }
         canvas { border-radius: 1rem; width: 100% !important; height: auto !important; border: 2px solid #334155; }
         .start-btn { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); transition: all 0.3s ease; }
-        .start-btn:hover { transform: scale(1.02); box-shadow: 0 0 20px rgba(37, 99, 235, 0.4); }
+        .start-btn:hover { transform: scale(1.05); box-shadow: 0 0 25px rgba(37, 99, 235, 0.5); }
     </style>
 </head>
-<body class="p-6 max-w-md mx-auto">
+<body class="p-6 max-w-md mx-auto min-h-screen flex flex-col">
 
     <div class="text-center mb-8">
-        <h1 class="text-2xl font-bold tracking-tight text-blue-400">DermDx AI</h1>
-        <p class="text-xs text-slate-400 uppercase tracking-widest mt-1">Clinical Support Utility</p>
+        <h1 class="text-3xl font-bold tracking-tight text-blue-400">DermDx AI</h1>
+        <p class="text-[10px] text-slate-400 uppercase tracking-[0.2em] mt-1 font-semibold">Clinical Decision Support Utility</p>
     </div>
 
-    <div id="webcam-container" class="relative mb-6 shadow-2xl overflow-hidden rounded-2xl bg-slate-800 flex items-center justify-center min-h-[300px]">
-        <button id="init-button" type="button" onclick="init()" class="start-btn absolute z-10 px-8 py-4 rounded-full font-bold shadow-xl">
+    <div id="webcam-container" class="relative mb-6 shadow-2xl overflow-hidden rounded-3xl bg-slate-800 flex items-center justify-center min-h-[350px]">
+        <button id="init-button" type="button" onclick="init()" class="start-btn absolute z-10 px-10 py-5 rounded-full font-bold shadow-2xl tracking-wide">
             START ANALYSIS
         </button>
-    </div>
+        </div>
 
-    <div id="label-container" class="space-y-3">
-        <div class="bg-slate-800/50 border border-slate-700 p-6 rounded-xl text-center">
-            <p class="text-slate-500 text-sm">System Ready. Please tap Start.</p>
+    <div id="label-container" class="space-y-4">
+        <div class="bg-slate-800/40 border border-slate-700/50 p-8 rounded-2xl text-center">
+            <p class="text-slate-500 text-sm font-medium">Ready for clinical input.<br>Point camera at affected area.</p>
         </div>
     </div>
 
-    <div class="mt-8 text-[10px] text-slate-600 text-center leading-relaxed">
-        PROTOTYPE ONLY. NOT FOR DIAGNOSIS.<br>
-        PRIVACY-BY-DESIGN: ON-DEVICE INFERENCE ACTIVE.
+    <div class="mt-auto pt-8">
+        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-800/50">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[9px] font-bold text-blue-500 uppercase tracking-tighter">Encryption Status</span>
+                <span class="text-[9px] text-green-500 font-bold uppercase tracking-tighter italic">● Stateless / Local Only</span>
+            </div>
+            <p class="text-[10px] text-slate-600 leading-relaxed text-center">
+                <strong>Disclaimer:</strong> This is a prototype utility. Results are for clinical decision support and do not constitute a final diagnosis.
+            </p>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
@@ -42,21 +49,29 @@
     <script type="text/javascript">
         const URL = "./"; 
         let model, webcam, labelContainer, maxPredictions;
+        
+        // Logic Constants for Stability
         let predictionHistory = [];
         const HISTORY_SIZE = 10; 
         const CONFIDENCE_THRESHOLD = 0.70;
 
         async function init() {
+            // Hide button once started
             document.getElementById("init-button").style.display = "none";
+            
             const modelURL = URL + "model.json";
             const metadataURL = URL + "metadata.json";
 
+            // Load the model and metadata
             model = await tmImage.load(modelURL, metadataURL);
             maxPredictions = model.getTotalClasses();
 
-            const flip = true; 
-            webcam = new tmImage.Webcam(300, 300, flip); 
-            await webcam.setup(); 
+            // Setup for BACK camera (Environment Mode)
+            const flip = false; // No mirror for back camera
+            webcam = new tmImage.Webcam(400, 400, flip); 
+            
+            // Force facingMode: environment for mobile users
+            await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
             window.requestAnimationFrame(loop);
 
@@ -72,9 +87,12 @@
 
         async function predict() {
             const prediction = await model.predict(webcam.canvas);
+            
+            // Push current prediction to history for smoothing
             predictionHistory.push(prediction);
             if (predictionHistory.length > HISTORY_SIZE) predictionHistory.shift();
 
+            // Calculate moving averages across the last 10 frames
             let averagedResults = [];
             let topClass = { name: "", prob: 0 };
 
@@ -91,13 +109,15 @@
                 }
             }
 
+            // UI LOGIC: Check for 'Neither' class or general low confidence
             if (topClass.name === "Neither" || topClass.prob < CONFIDENCE_THRESHOLD) {
                 labelContainer.innerHTML = `
-                    <div class="bg-slate-900 border-2 border-dashed border-slate-700 p-8 rounded-2xl text-center">
-                        <span class="text-slate-500 font-medium italic">Scanning for Markers...</span>
-                        <p class="text-[9px] text-slate-600 mt-2 uppercase tracking-widest">Adjust framing for conclusive result</p>
+                    <div class="bg-slate-900 border-2 border-dashed border-slate-700 p-10 rounded-3xl text-center shadow-inner">
+                        <span class="text-slate-500 font-semibold italic text-lg block">Scanning...</span>
+                        <p class="text-[9px] text-slate-600 mt-3 uppercase tracking-[0.3em] font-bold">Waiting for conclusive clinical markers</p>
                     </div>`;
             } else {
+                // Display Medical Predictions (Hiding the 'Neither' bar from list)
                 let resultsHTML = "";
                 averagedResults.forEach(res => {
                     if (res.name !== "Neither") {
@@ -105,9 +125,11 @@
                         const probDisplay = (res.prob * 100).toFixed(0);
                         
                         resultsHTML += `
-                            <div class="bg-slate-800 border ${isWinner ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-slate-700'} p-5 rounded-2xl flex justify-between items-center transition-all duration-300">
-                                <span class="${isWinner ? 'text-white font-bold' : 'text-slate-400'}">${res.name}</span>
-                                <span class="${isWinner ? 'text-blue-400' : 'text-slate-500'} font-mono text-2xl">${probDisplay}%</span>
+                            <div class="bg-slate-800 border-2 ${isWinner ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-slate-700/50'} p-6 rounded-2xl flex justify-between items-center transition-all duration-300">
+                                <span class="${isWinner ? 'text-white font-bold text-lg' : 'text-slate-400 font-medium'}">${res.name}</span>
+                                <div class="flex items-center">
+                                    <span class="${isWinner ? 'text-blue-400' : 'text-slate-500'} font-mono text-3xl font-bold">${probDisplay}%</span>
+                                </div>
                             </div>`;
                     }
                 });
