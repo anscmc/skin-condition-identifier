@@ -1,38 +1,16 @@
-const CACHE_NAME = 'dermdx-ai-v1.2'; // BUMPED VERSION
-const assets = [
-  './', 
-  './index.html', 
-  './model.json', 
-  './metadata.json', 
-  './weights.bin'
-];
+const CACHE_NAME = 'dermdx-v1.3'; // BUMPED VERSION
+const assets = ['./', './index.html', './model.json', './metadata.json', './weights.bin', './manifest.json'];
 
-// Install: Cache new assets
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(assets);
-    })
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(assets)));
 });
 
-// Activate: Delete old caches so the new UI/Model shows up
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.filter((name) => name !== CACHE_NAME)
-                  .map((name) => caches.delete(name))
-      );
-    })
+    caches.keys().then((keys) => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
   );
 });
 
-// Fetch: Serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
-  );
+  event.respondWith(caches.match(event.request).then((res) => res || fetch(event.request)));
 });
