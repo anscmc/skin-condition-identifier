@@ -1,6 +1,6 @@
 {
-  "name": "Skin AI Classifier",
-  "short_name": "SkinAI",
+  "name": "DermDx AI",
+  "short_name": "DermDx",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#0f172a",
