@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dermdx-v1.4'; // BUMPED VERSION
+const CACHE_NAME = 'dermdx-v1.5'; // BUMPED VERSION
 const assets = [
   './', 
   './index.html', 
