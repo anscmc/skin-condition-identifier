@@ -1,5 +1,13 @@
-const CACHE_NAME = 'dermdx-v1.3'; // BUMPED VERSION
-const assets = ['./', './index.html', './model.json', './metadata.json', './weights.bin', './manifest.json'];
+const CACHE_NAME = 'dermdx-v1.4'; // BUMPED VERSION
+const assets = [
+  './', 
+  './index.html', 
+  './model.json', 
+  './metadata.json', 
+  './weights.bin', 
+  './manifest.json',
+  './app-icon.png' // Added your new icon here
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(assets)));
