@@ -8,13 +8,13 @@
   "theme_color": "#3b82f6",
   "icons": [
     {
-      "src": "app-icon.png",
+      "src": "dermrxai.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "app-icon.png",
+      "src": "dermrxai.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
