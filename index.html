@@ -48,10 +48,10 @@
         const HISTORY_SIZE = 10; 
         const CONFIDENCE_THRESHOLD = 0.70;
 
-        // Register Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js');
-        }
+       // Register Service Worker
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+}
 
         async function init() {
             document.getElementById("init-button").style.display = "none";
