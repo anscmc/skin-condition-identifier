@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dermdx-v1.5'; // BUMPED VERSION
+const CACHE_NAME = 'dermdx-v1.7'; // BUMPED VERSION
 const assets = [
   './', 
   './index.html', 
@@ -6,7 +6,7 @@ const assets = [
   './metadata.json', 
   './weights.bin', 
   './manifest.json',
-  './app-icon.png' // Added your new icon here
+  './dermrxai.png' // Matches your uploaded file
 ];
 
 self.addEventListener('install', (event) => {
