@@ -1,20 +1,19 @@
 {
   "name": "DermDx AI Clinical Support",
   "short_name": "DermDx",
-  "description": "On-device dermatological triage utility.",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#3b82f6",
+  "background_color": "#3b82f6", 
+  "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "dermrxai.png",
+      "src": "app-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "dermrxai.png",
+      "src": "app-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
